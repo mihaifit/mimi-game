@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#c4a8f5" />
+    <meta name="description" content="MIMI, tu mascota de gelatina lavanda. Cuídala y juega a MIMI HOP." />
+    <title>MIMI · mascota de gelatina</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="game" aria-hidden="true"></div>
+
+      <header id="hud" class="room-only">
+        <div class="hud-row">
+          <h1 class="brand">MIMI <span id="personality-badge" class="badge"></span></h1>
+          <div class="hud-right">
+            <span class="coins" aria-label="Monedas"><span aria-hidden="true">🪙</span> <b id="coins">0</b></span>
+            <button id="btn-help" class="icon-btn" type="button" aria-label="Guía y personalidad">?</button>
+          </div>
+        </div>
+        <ul class="meters" aria-label="Necesidades de MIMI">
+          <li><span class="m-label"><span aria-hidden="true">🍓</span> Comida</span><div class="meter" role="meter" aria-label="Comida" aria-valuemin="0" aria-valuemax="100" data-stat="hunger"><i></i></div></li>
+          <li><span class="m-label"><span aria-hidden="true">🫧</span> Limpieza</span><div class="meter" role="meter" aria-label="Limpieza" aria-valuemin="0" aria-valuemax="100" data-stat="clean"><i></i></div></li>
+          <li><span class="m-label"><span aria-hidden="true">🌙</span> Sueño</span><div class="meter" role="meter" aria-label="Energía" aria-valuemin="0" aria-valuemax="100" data-stat="energy"><i></i></div></li>
+          <li><span class="m-label"><span aria-hidden="true">💜</span> Felicidad</span><div class="meter" role="meter" aria-label="Felicidad" aria-valuemin="0" aria-valuemax="100" data-stat="happiness"><i></i></div></li>
+        </ul>
+        <p id="need" class="need"></p>
+      </header>
+
+      <p id="toast" class="toast" role="status" aria-live="polite"></p>
+
+      <nav id="actions" class="room-only" aria-label="Acciones">
+        <button type="button" data-action="feed"><span aria-hidden="true">🍓</span>Comer<kbd>C</kbd></button>
+        <button type="button" data-action="wash"><span aria-hidden="true">🫧</span>Bañar<kbd>B</kbd></button>
+        <button type="button" data-action="sleep" id="btn-sleep"><span aria-hidden="true">🌙</span><em>Dormir</em><kbd>D</kbd></button>
+        <button type="button" data-action="pet"><span aria-hidden="true">💜</span>Mimos<kbd>M</kbd></button>
+        <button type="button" data-action="play" class="primary"><span aria-hidden="true">🐇</span>Jugar<kbd>J</kbd></button>
+        <button type="button" data-action="shop"><span aria-hidden="true">🛍️</span>Tienda<kbd>T</kbd></button>
+      </nav>
+
+      <header id="hop-hud" class="hop-only" hidden>
+        <button id="btn-hop-back" class="pill-btn" type="button">← Volver</button>
+        <div class="hop-score" aria-live="off"><span>Puntos</span><b id="hop-score">0</b></div>
+        <div class="hop-score"><span>Récord</span><b id="hop-best">0</b></div>
+      </header>
+    </div>
+
+    <dialog id="dlg-guide" aria-labelledby="guide-title">
+      <h2 id="guide-title">¡Hola! Soy MIMI 💜</h2>
+      <ol class="guide">
+        <li>Mira mis barras: comida, limpieza, sueño y felicidad bajan con el tiempo.</li>
+        <li>Usa <b>Comer</b>, <b>Bañar</b> y <b>Dormir</b>. Tócame o acaríciame para darme mimos.</li>
+        <li>Juega a <b>MIMI HOP</b>: salta con un toque o con Espacio y gana monedas.</li>
+        <li>Gasta monedas en la <b>Tienda</b> y equípame accesorios.</li>
+      </ol>
+      <h3>Elige mi personalidad</h3>
+      <div id="personalities" class="choices" role="radiogroup" aria-label="Personalidad"></div>
+      <p class="fine">Todo se guarda solo en este navegador. Sin cuentas, sin anuncios, sin pagos.</p>
+      <div class="dlg-actions">
+        <button type="button" id="btn-reset" class="ghost">Borrar partida</button>
+        <button type="button" id="btn-guide-ok" class="primary">¡A jugar!</button>
+      </div>
+    </dialog>
+
+    <dialog id="dlg-shop" aria-labelledby="shop-title">
+      <div class="dlg-head">
+        <h2 id="shop-title">Tienda</h2>
+        <span class="coins"><span aria-hidden="true">🪙</span> <b id="shop-coins">0</b></span>
+      </div>
+      <p class="fine">Monedas de juego, ganadas en MIMI HOP. Toca un accesorio comprado para ponerlo o quitarlo.</p>
+      <ul id="shop-list" class="shop"></ul>
+      <p id="shop-msg" class="shop-msg" role="status" aria-live="polite"></p>
+      <div class="dlg-actions"><button type="button" id="btn-shop-close" class="primary">Cerrar</button></div>
+    </dialog>
+
+    <dialog id="dlg-over" aria-labelledby="over-title">
+      <h2 id="over-title">¡Fin de la partida!</h2>
+      <p class="over-score"><b id="over-score">0</b> puntos</p>
+      <p id="over-best" class="fine"></p>
+      <p id="over-coins" class="over-coins"></p>
+      <div class="dlg-actions">
+        <button type="button" id="btn-over-room" class="ghost">Volver a casa</button>
+        <button type="button" id="btn-over-retry" class="primary">Reintentar</button>
+      </div>
+    </dialog>
+
+    <noscript>MIMI necesita JavaScript para funcionar.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
