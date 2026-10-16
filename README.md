@@ -2,9 +2,28 @@
 
 MIMI: mascota de gelatina lavanda y minijuego MIMI HOP. Phaser, TypeScript y Vite.
 
-MVP web/móvil jugable: cuida a Mimi en su habitación, gana monedas en **MIMI HOP** y cómpralas en accesorios.
+**Versión 0.2.0.** Juego web/móvil: cuida a Mimi en su habitación, sube vuestro **nivel de vínculo**, completa
+**misiones diarias** y **logros**, haz una **pausa activa** corta con ella, gana monedas en **MIMI HOP** y gástalas en accesorios.
 Todo funciona en el navegador: sin backend, sin pagos, sin anuncios, sin IA externa y sin activos de terceros
-(Mimi, la habitación, los accesorios y los obstáculos se dibujan con Canvas 2D propio en `src/art/art.ts`).
+(Mimi, la habitación, los accesorios y los obstáculos se dibujan con Canvas 2D propio en `src/art/art.ts`;
+los sonidos se sintetizan con Web Audio en `src/audio/sfx.ts`, sin archivos).
+
+### Novedades 0.2.0
+
+- **Sonido propio** (Web Audio): caricias, comida, baño, sueño, salto, punto, golpe, compra, misión y subida de nivel.
+  Botón 🔊/🔇 siempre visible arriba y volumen en Ajustes (se recuerdan). El audio solo se activa tras tocar/pulsar algo;
+  silenciar corta al instante. No hay música ni nada que suene solo. Si el navegador no tiene Web Audio, el juego sigue igual.
+- **Vínculo**: experiencia y niveles con barra clara. Cada subida da monedas una sola vez, confeti y salto de celebración.
+- **Misiones diarias** (cuidado útil, superar 3 obstáculos acumulados, momento de movimiento) y **8 logros** permanentes con objetivo visible.
+- **Más vida**: frases cortas según personalidad y estado, "+XP" flotante y avisos en cola.
+- **Retos MihaiFIT** (primer puente con MihaiFIT): pausas activas «Activa tu día» (1 min) y «Hoy toca moverse» (2 min)
+  con Mimi moviéndose contigo. Registro manual y local.
+- **Accesorios MihaiFIT**: **Cinta MihaiFIT** (cabeza, regalo del nivel 3) y **Pañuelo MihaiFIT** (cuello, regalo al
+  confirmar 3 retos). Se pueden llevar a la vez y se ven en la habitación y en MIMI HOP.
+- Guiño de marca acotado: solo la cápsula de Retos y los accesorios usan carbón `#070A08`, grafito `#141A16`,
+  texto `#EEF1E8` y un acento lima `#C9FF2F` fino (por debajo del 10 % de la pieza) y el lema «Hoy toca.».
+  El resto de MIMI mantiene su lavanda. Sin logos inventados: solo el nombre escrito.
+- Pestañas en rejilla 3×2 legibles a 360 px.
 
 ## Pila
 
@@ -32,12 +51,16 @@ npm run preview   # sirve dist/
 **Habitación**
 - Botones **Alimentar**, **Limpiar**, **Dormir/Despertar** y **Caricias**.
 - Tocar o hacer clic sobre Mimi = caricias.
+- Botón 🔊/🔇 arriba a la derecha: silenciar/activar sonido.
 - Las pestañas se recorren con `←` `→` `Inicio` `Fin`; todo es accesible con teclado y lector de pantalla
   (barras de necesidades con `role="progressbar"`, avisos en región `aria-live`).
 
 **MIMI HOP**
 - Saltar: tocar la escena, `Espacio`, `↑`, `W` o el botón **Saltar**.
 - El primer salto empieza la partida. Al chocar aparece el resumen con **Reintentar** / **Volver a la habitación**.
+
+**Retos MihaiFIT** (pestaña «Retos MihaiFIT»)
+- Elige «Activa tu día» (1 min) o «Hoy toca moverse» (2 min), **Empezar**, **Pausar/Continuar** o **Cancelar**. Al acabar el tiempo, confirma si hiciste la pausa.
 
 ## Reglas y límites (verificados por pruebas)
 
@@ -55,7 +78,7 @@ npm run preview   # sirve dist/
 
 **Monedas y tienda**
 - Se empieza con 20 monedas. Máximo 999 999.
-- 7 accesorios (15–60 monedas) en 3 zonas: cabeza, cara, cuello. Uno por zona.
+- 7 accesorios de tienda (15–60 monedas) + Cinta MihaiFIT (regalo del nivel 3) y Pañuelo MihaiFIT (regalo de 3 retos), en 3 zonas: cabeza, cara, cuello. Uno por zona.
 - Comprar sin saldo suficiente se rechaza y dice cuántas monedas faltan: **el saldo nunca es negativo**.
 - Lo comprado se equipa automáticamente; volver a pulsar lo quita / lo pone.
 
@@ -66,8 +89,47 @@ npm run preview   # sirve dist/
 - Récord local guardado en el dispositivo. No hay clasificaciones online.
 - Cada partida gasta 6 de energía y da 6 de cariño. Con energía < 10 o dormida no se puede jugar.
 
+**Vínculo (XP y niveles)**
+- Pasar del nivel *n* al siguiente cuesta `30 + 15·(n−1)` XP (nivel 2 = 30 XP, nivel 3 = 75 XP). Máximo nivel 50.
+- Subir a nivel *n* da `10 + 2·n` monedas **una sola vez** (`levelRewarded` guarda el último nivel pagado).
+- Nivel 3: regalo de la **Cinta MihaiFIT** (id `cinta`, cabeza). Se pone sola solo si la cabeza estaba libre; no se puede comprar.
+- 3 retos confirmados (`stats.movePauses ≥ 3`, cuenten o no para el premio diario): logro «Hoy toca.» y regalo del
+  **Pañuelo MihaiFIT** (id `panuelo-mihaifit`, cuello), una sola vez; se pone solo si el cuello estaba libre.
+  Un guardado que tenga el pañuelo sin ese logro (o la cinta sin el nivel 3) lo pierde al validarse.
+- XP de cuidados: **+5** solo si el cuidado es *útil* (saciedad o limpieza < 70, cariño < 80, energía < 40 al dormir)
+  y como mucho **una vez cada 45 s por tipo**. Spamear caricias no da más. Si el reloj retrocede, no se da XP y la espera se reinicia.
+- MIMI HOP: `2 + floor(puntos/2)` XP, máximo 15, una vez por partida (mismo identificador que las monedas).
+- No hay castigos: la XP nunca baja y no pasa nada por no volver.
+
+**Misiones diarias** (fecha local AAAA-MM-DD)
+- Cuidado útil ×3 (+8 monedas, +15 XP) · Superar 3 obstáculos en MIMI HOP, acumulados (+8, +15 XP) · 1 reto MihaiFIT (+10, +20 XP).
+- Cada misión se reclama **una vez al día**; el estado se guarda, así que recargar no permite cobrar otra vez.
+- Se renuevan cuando la fecha local es posterior a la guardada. Si el reloj va **hacia atrás**, se conserva el día guardado (no se renueva ni se duplica nada).
+
+**Logros** (permanentes, se pagan una vez): Primer mimo útil (5), Cuidadora constante (25 cuidados útiles, 15),
+Saltarina (10 puntos en una partida, 10), Lazos fuertes (nivel 3, 10), En marcha (primer reto, 10),
+Hoy toca. (3 retos confirmados, 10 + **Pañuelo MihaiFIT**),
+Día redondo (las 3 misiones de un día, 15), Coleccionista (3 accesorios, 10).
+Una partida 0.1 que ya cumplía alguno (p. ej. récord ≥ 10) lo recibe una vez al cargarla.
+
+**Retos MihaiFIT (pausa activa)**
+- «Activa tu día» = 1 minuto, «Hoy toca moverse» = 2 minutos (mismas reglas para ambos). Sugerencias suaves que cambian cada 20 s ("estírate", "camina un poco", "baila"…);
+  sin repeticiones, calorías ni indicaciones clínicas.
+- Solo cuenta con la app **en primer plano**: al ocultar la pestaña/app se **pausa** (nunca se completa sola). Además,
+  si entre dos ticks pasan más de 1,5 s (pestaña congelada) ese tiempo no cuenta y queda en pausa.
+- Al terminar, la persona confirma "Sí, lo he hecho" → +5 monedas y +10 XP, **máximo 2 retos con premio al día**.
+  Cada pausa tiene identificador: confirmar dos veces, recargar o reutilizar una sesión antigua no vuelve a pagar.
+- Es un **registro manual y local**: sin cuenta, sensores, pasos, entrenamientos reales ni envío de datos.
+- Enlace sencillo a <https://www.mihaifit.es/> (`rel="noopener noreferrer"`, sin parámetros de seguimiento).
+  No hay integración con WordPress ni con cuentas de MihaiFIT.
+
 **Guardado local**
-- `localStorage` clave `mimi-game.save`, formato `{ version: 1, savedAt, state }`.
+- `localStorage` clave `mimi-game.save`, formato `{ version: 2, savedAt, state }`.
+- **Migración 0.1 → 0.2 aditiva**: un guardado `version: 1` conserva nombre, personalidad, necesidades, monedas, accesorios,
+  equipados, récord y contadores de MIMI HOP; los campos nuevos (XP, misiones, logros…) toman valores por defecto.
+  Antes de reescribirlo se guarda una copia exacta en `mimi-game.save.v1` (solo la primera vez).
+- Versiones no enteras o < 1 se tratan como dañadas.
+- Preferencias de sonido aparte, en `mimi-game.prefs` (`{ sound, volume }`).
 - Al cargar se valida y normaliza todo (rangos, tipos, accesorios inexistentes, equipados sin comprar, fechas futuras).
 - JSON dañado → partida nueva y copia del original en `mimi-game.save.backup`.
 - Guardado de una versión más nueva → no se sobrescribe.
@@ -77,13 +139,45 @@ npm run preview   # sirve dist/
 
 ```
 src/
-  state/   model, care (necesidades, cuidados, recompensas), personality, shop, storage, store
+  state/   model, care (necesidades, cuidados, recompensas), progress (XP, niveles, misiones, logros),
+           movement (pausa activa), voice (frases), personality, shop, storage (+ migración), prefs, store
+  audio/   sfx.ts — efectos Web Audio sintetizados
   hop/     hopLogic.ts — física, obstáculos, colisiones y puntuación (pura, sin Phaser)
   art/     art.ts — dibujo procedural de Mimi, accesorios, habitación y escenario
   scenes/  RoomScene, HopScene, MimiRig (capas: respiración, parpadeo, squash/stretch, mirada)
   ui/      ui.ts — interfaz DOM en español
-tests/     pruebas Vitest
+tests/     pruebas Vitest (migración v1, datos dañados, XP/niveles, anti-spam, misiones/fechas/reloj atrás,
+           temporizador y segundo plano, audio con AudioContext falso, tienda)
+scripts/   smoke.mjs — prueba de humo en Chromium real con WebGL
+docs/      capturas de la prueba de humo
 ```
+
+## Prueba de humo en navegador (`scripts/smoke.mjs`)
+
+Recorre en Chromium con WebGL (móvil 360×780 y escritorio 1280×860): migración de un guardado 0.1, WebGL activo,
+audio tras gesto + silenciar/reactivar, cuidado útil y XP con enfriamiento, reclamar misión una sola vez,
+pausa activa (pausar, segundo plano simulado, continuar, esperar el minuto real, confirmar una sola vez),
+recarga con guardado intacto, partida de MIMI HOP, compra en tienda, subida a nivel 3 con cinta, y que no haya
+errores de consola. Tarda ~2 minutos (espera el minuto real de la pausa). Deja capturas en `smoke-shots/`.
+
+Playwright **no** es dependencia del proyecto. Con Playwright instalado globalmente:
+
+```bash
+npm run build
+npx vite preview --port 4173 &
+NODE_PATH="$(npm root -g)" node scripts/smoke.mjs http://localhost:4173/
+# o bien: npm i --no-save playwright && npx playwright install chromium && node scripts/smoke.mjs http://localhost:4173/
+```
+
+Para probar la migración con un guardado creado por la **0.1 real**, sirve ambos builds en el mismo origen
+(p. ej. `site/v1/` = build de la 0.1 y `site/v2/` = build actual) y pasa `V1_URL`:
+
+```bash
+V1_URL=http://localhost:4173/v1/ NODE_PATH="$(npm root -g)" node scripts/smoke.mjs http://localhost:4173/v2/
+```
+
+Variables opcionales: `SHOTS=<carpeta>` para las capturas y `CHROMIUM_PATH=<ruta>` para usar otro Chromium.
+El script usa `window.__mimi` solo para leer el estado y preparar condiciones (necesidades bajas, monedas, XP de prueba).
 
 ## Despliegue
 
@@ -93,6 +187,20 @@ Gracias a `base: './'` funciona bajo `https://<usuario>.github.io/mimi-game/`.
 
 ## Limitaciones conocidas
 
-- Sin sonido.
+- Los sonidos son efectos cortos sintetizados (sin música).
+- La pausa activa no se reanuda tras recargar la página (el temporizador vive en memoria; la sesión simplemente no cuenta).
+- Las misiones dependen de la fecha del dispositivo: adelantar el reloj adelanta la renovación (es un juego local, sin servidor).
 - El bundle de Phaser pesa ~1,4 MB (≈ 373 kB gzip); no se ha optimizado la carga.
 - El progreso vive solo en el navegador del dispositivo: no se sincroniza entre dispositivos.
+
+## Capturas (prueba de humo, Chromium + WebGL)
+
+| Habitación (360 px) | Misiones | Retos MihaiFIT | Accesorios MihaiFIT |
+| --- | --- | --- | --- |
+| ![Habitación](docs/screenshots/movil-habitacion.png) | ![Misiones](docs/screenshots/movil-misiones.png) | ![Retos MihaiFIT](docs/screenshots/movil-retos.png) | ![Cinta y Pañuelo MihaiFIT](docs/screenshots/movil-accesorios.png) |
+
+| MIMI HOP con accesorios | Cápsula MihaiFIT |
+| --- | --- |
+| ![HOP](docs/screenshots/hop-accesorios.png) | ![Cápsula](docs/screenshots/movil-capsula.png) |
+
+![Escritorio](docs/screenshots/escritorio.png)

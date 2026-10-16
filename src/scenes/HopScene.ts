@@ -7,6 +7,7 @@ import { MimiRig } from './mimiRig';
 /** Eventos emitidos en game.events. */
 export const HOP_EVENTS = {
   begin: 'hop:begin',
+  jump: 'hop:jumped',
   score: 'hop:score',
   over: 'hop:over',
 } as const;
@@ -133,7 +134,10 @@ export class HopScene extends Phaser.Scene {
       const v = Phaser.Math.Clamp(run.vy / 1400, -1, 1);
       this.mimi.setStretch(1 - Math.abs(v) * 0.14, 1 + Math.abs(v) * 0.16);
     }
-    if (ev.jumped) this.mimi.flashMouth('open', 300, 'happy');
+    if (ev.jumped) {
+      this.mimi.flashMouth('open', 300, 'happy');
+      this.game.events.emit(HOP_EVENTS.jump);
+    }
     if (ev.landed) this.mimi.squash(0.6);
     if (ev.scored > 0) {
       this.scoreText.setText(String(run.score));

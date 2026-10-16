@@ -6,16 +6,22 @@ export interface ShopItem {
   name: string;
   slot: Slot;
   price: number;
+  /** Si existe, no se compra: se regala al llegar a este nivel de vínculo. */
+  unlockLevel?: number;
+  /** Si existe, no se compra: se regala al conseguir este logro. */
+  unlockAchievement?: string;
 }
 
 export const SHOP_ITEMS: readonly ShopItem[] = [
   { id: 'lazo', name: 'Lazo rosa', slot: 'head', price: 15 },
   { id: 'gorro', name: 'Gorrito de lana', slot: 'head', price: 35 },
   { id: 'corona', name: 'Corona de flores', slot: 'head', price: 60 },
+  { id: 'cinta', name: 'Cinta MihaiFIT', slot: 'head', price: 0, unlockLevel: 3 },
   { id: 'gafas', name: 'Gafas redondas', slot: 'face', price: 25 },
   { id: 'estrellas', name: 'Gafas de estrella', slot: 'face', price: 45 },
   { id: 'pajarita', name: 'Pajarita', slot: 'neck', price: 20 },
   { id: 'bufanda', name: 'Bufanda menta', slot: 'neck', price: 40 },
+  { id: 'panuelo-mihaifit', name: 'Pañuelo MihaiFIT', slot: 'neck', price: 0, unlockAchievement: 'retos-3' },
 ];
 
 export const SLOT_LABELS: Record<Slot, string> = { head: 'Cabeza', face: 'Cara', neck: 'Cuello' };
@@ -28,6 +34,12 @@ export function buyItem(state: GameState, id: string): ActionResult {
   const item = findItem(id);
   if (!item) return { state, ok: false, message: 'Ese accesorio no existe.' };
   if (state.owned.includes(id)) return { state, ok: false, message: `Ya tienes ${item.name}.` };
+  if (item.unlockLevel) {
+    return { state, ok: false, message: `${item.name} no se compra: se consigue al llegar al nivel ${item.unlockLevel} de vínculo.` };
+  }
+  if (item.unlockAchievement) {
+    return { state, ok: false, message: `${item.name} no se compra: se consigue al completar 3 retos MihaiFIT.` };
+  }
   if (state.coins < item.price) {
     const missing = item.price - state.coins;
     return { state, ok: false, message: `Te faltan ${missing} ${missing === 1 ? 'moneda' : 'monedas'} para ${item.name}.` };
@@ -50,5 +62,5 @@ export function toggleEquip(state: GameState, id: string): ActionResult {
     return { state: next, ok: true, message: `Le has quitado ${item.name}.` };
   }
   next.equipped[item.slot] = id;
-  return { state: next, ok: true, message: `Mimi lleva ${item.name}.` };
+  return { state: next, ok: true, message: `${state.name} lleva ${item.name}.` };
 }

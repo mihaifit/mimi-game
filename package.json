@@ -1,15 +1,16 @@
 {
   "name": "mimi-game",
   "private": true,
-  "version": "0.1.0",
-  "description": "MIMI: mascota de gelatina lavanda y minijuego MIMI HOP (Phaser + TypeScript + Vite).",
+  "version": "0.2.0",
+  "description": "MIMI: mascota de gelatina lavanda con progresión, misiones, pausa activa y minijuego MIMI HOP (Phaser + TypeScript + Vite).",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "phaser": "4.2.1"

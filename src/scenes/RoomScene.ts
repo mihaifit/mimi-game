@@ -2,8 +2,13 @@ import * as Phaser from 'phaser';
 import { drawRoom } from '../art/art';
 import { moodOf, type GameState } from '../state/model';
 import { pet } from '../state/care';
-import type { Store, StoreEvent } from '../state/store';
+import type { CareEventKind, Store, StoreEvent } from '../state/store';
 import { MimiRig } from './mimiRig';
+
+// Mismos nombres que MOVE_EVENTS en ui.ts (sin importar la UI desde la escena).
+const MOVE_STATE = 'move:state';
+const MOVE_CELEBRATE = 'move:celebrate';
+const CONFETTI = [0xff9fcf, 0xffd25a, 0x7ff0c8, 0xb49bf2, 0x8fd0ff, 0xffffff];
 
 export const VIEW_W = 720;
 export const VIEW_H = 540;
@@ -16,6 +21,8 @@ export class RoomScene extends Phaser.Scene {
   private zTimer?: Phaser.Time.TimerEvent;
   private idleTimer?: Phaser.Time.TimerEvent;
   private sleeping = false;
+  private exercise?: Phaser.Time.TimerEvent;
+  private exerciseStep = 0;
 
   constructor() {
     super('room');
@@ -33,15 +40,20 @@ export class RoomScene extends Phaser.Scene {
     // Zona táctil sobre Mimi: tocarla es darle caricias.
     const hit = this.add.zone(VIEW_W / 2, 468 - 95, 230, 200).setInteractive({ useHandCursor: true });
     hit.on('pointerdown', () => {
-      this.store.run(pet, { type: 'care', kind: 'pet' });
+      this.store.run(pet, 'pet');
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.mimi.lookAt(p.x, p.y));
 
     this.applyState(this.store.state, true);
     this.unsubscribe = this.store.subscribe((s, e) => this.onStore(s, e));
     this.idleTimer = this.time.addEvent({ delay: 7000, loop: true, callback: () => this.idleHop() });
+    this.game.events.on(MOVE_STATE, this.onMoveState, this);
+    this.game.events.on(MOVE_CELEBRATE, this.celebrate, this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off(MOVE_STATE, this.onMoveState, this);
+      this.game.events.off(MOVE_CELEBRATE, this.celebrate, this);
+      this.exercise?.remove();
       this.unsubscribe?.();
       this.zTimer?.remove();
       this.idleTimer?.remove();
@@ -51,7 +63,109 @@ export class RoomScene extends Phaser.Scene {
 
   private onStore(state: GameState, e: StoreEvent): void {
     if (e.type === 'state') this.applyState(state, false);
-    else if (e.type === 'care') this.playCare(e.kind);
+    else if (e.type === 'care') {
+      this.playCare(e.kind);
+      if (e.xp > 0) this.floatText(`+${e.xp} XP`, '#5b3fb5');
+    } else if (e.type === 'levelup') this.celebrate();
+  }
+
+  /** Texto flotante sobre Mimi (+XP). */
+  private floatText(text: string, color: string): void {
+    const top = this.mimi.topWorld();
+    const t = this.add
+      .text(top.x + 70, top.y + 20, text, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '30px',
+        fontStyle: 'bold',
+        color,
+        stroke: '#ffffff',
+        strokeThickness: 7,
+      })
+      .setOrigin(0.5)
+      .setDepth(7);
+    this.tweens.add({
+      targets: t,
+      y: t.y - 70,
+      alpha: { from: 1, to: 0 },
+      scale: { from: 0.7, to: 1.1 },
+      duration: 1300,
+      ease: 'Sine.easeOut',
+      onComplete: () => t.destroy(),
+    });
+  }
+
+  /** Subida de nivel o pausa completada: salto con giro y confeti. */
+  private celebrate(): void {
+    if (!this.sys.isActive()) return;
+    const base = this.mimi.root;
+    const y0 = base.y;
+    this.mimi.flashMouth('open', 1200, 'happy');
+    this.mimi.squash(1);
+    this.tweens.chain({
+      targets: base,
+      tweens: [
+        { y: y0 - 70, angle: -8, duration: 260, ease: 'Quad.easeOut' },
+        { y: y0, angle: 0, duration: 240, ease: 'Bounce.easeOut' },
+        { y: y0 - 30, duration: 160, ease: 'Quad.easeOut', delay: 60 },
+        { y: y0, duration: 180, ease: 'Quad.easeIn' },
+      ],
+      onComplete: () => {
+        base.y = y0;
+        base.angle = 0;
+        this.mimi.squash(0.8);
+      },
+    });
+    const top = this.mimi.topWorld();
+    for (let i = 0; i < 36; i++) {
+      const color = CONFETTI[i % CONFETTI.length];
+      const piece =
+        i % 6 === 0
+          ? this.add.image(top.x, top.y + 40, 'fx-heart').setScale(0.45)
+          : i % 3 === 0
+            ? this.add.image(top.x, top.y + 40, 'fx-sparkle').setScale(0.4)
+            : this.add.rectangle(top.x, top.y + 40, 12, 7, color);
+      piece.setDepth(7);
+      const a = Phaser.Math.FloatBetween(-Math.PI, 0);
+      const speed = Phaser.Math.Between(160, 320);
+      this.tweens.add({
+        targets: piece,
+        x: top.x + Math.cos(a) * speed * 1.4,
+        y: top.y + 40 + Math.sin(a) * speed + Phaser.Math.Between(120, 260),
+        angle: Phaser.Math.Between(-360, 360),
+        alpha: { from: 1, to: 0 },
+        duration: Phaser.Math.Between(1300, 1900),
+        ease: 'Quad.easeOut',
+        onComplete: () => piece.destroy(),
+      });
+    }
+  }
+
+  /** Durante la pausa activa Mimi se estira y balancea contigo. */
+  private onMoveState(status: string): void {
+    if (status === 'running') {
+      if (this.exercise) return;
+      this.exerciseStep = 0;
+      this.exercise = this.time.addEvent({ delay: 700, loop: true, callback: () => this.exerciseBeat() });
+    } else {
+      this.exercise?.remove();
+      this.exercise = undefined;
+      this.tweens.add({ targets: this.mimi.root, angle: 0, duration: 200 });
+    }
+  }
+
+  private exerciseBeat(): void {
+    if (this.sleeping) return;
+    const step = this.exerciseStep++ % 4;
+    const root = this.mimi.root;
+    if (step === 0 || step === 2) {
+      // Estirarse hacia arriba.
+      this.mimi.setStretch(0.9, 1.14);
+      this.time.delayedCall(320, () => this.mimi.squash(0.5));
+    } else {
+      // Balanceo lateral.
+      this.tweens.add({ targets: root, angle: step === 1 ? -7 : 7, duration: 300, yoyo: true, ease: 'Sine.easeInOut' });
+    }
+    if (step === 0) this.mimi.flashMouth('smile', 600, 'happy');
   }
 
   private applyState(state: GameState, instant: boolean): void {
@@ -109,7 +223,7 @@ export class RoomScene extends Phaser.Scene {
     });
   }
 
-  private playCare(kind: 'feed' | 'clean' | 'pet' | 'sleep' | 'wake'): void {
+  private playCare(kind: CareEventKind): void {
     switch (kind) {
       case 'pet': {
         this.mimi.squash(1);

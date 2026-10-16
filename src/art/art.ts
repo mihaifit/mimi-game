@@ -454,6 +454,107 @@ export function drawAccessory(id: string): AccessoryArt | null {
       }
       return { canvas, x: 0, y: -40, originX: 0.5, originY: 0.4, behindFace: false };
     }
+    case 'cinta': {
+      // Cinta MihaiFIT: carbón/grafito con un filo lima fino (<10 %) y el nombre en texto claro.
+      // Lienzo del tamaño del cuerpo, recortada a su silueta para que abrace la cabeza.
+      const { canvas, ctx } = makeCanvas(BODY.w, BODY.h);
+      const mid = (x: number) => 95 + ((x - 120) / 100) ** 2 * 26;
+      const band = (offset: number, thick: number) => {
+        ctx.beginPath();
+        for (let x = 0; x <= BODY.w; x += 6) ctx.lineTo(x, mid(x) + offset - thick / 2);
+        for (let x = BODY.w; x >= 0; x -= 6) ctx.lineTo(x, mid(x) + offset + thick / 2);
+        ctx.closePath();
+      };
+      ctx.save();
+      bodyPath(ctx);
+      ctx.clip();
+      band(2, 24);
+      ctx.fillStyle = 'rgba(40,20,90,0.25)'; // sombra de contacto
+      ctx.fill();
+      band(0, 22);
+      ctx.fillStyle = linear(ctx, 0, 82, 0, 120, [
+        [0, '#141A16'],
+        [1, '#070A08'],
+      ]);
+      ctx.fill();
+      band(-8, 2);
+      ctx.fillStyle = 'rgba(238,241,232,0.18)'; // brillo de tela
+      ctx.fill();
+      band(9.6, 1.8);
+      ctx.fillStyle = '#C9FF2F'; // acento lima
+      ctx.fill();
+      // Nombre: casi recto en el centro de la frente (la curva ahí apenas baja 2 unidades).
+      ctx.fillStyle = '#EEF1E8';
+      ctx.font = '900 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('MihaiFIT', 120, mid(120) + 0.5);
+      ctx.restore();
+      // Nudo y cintas sueltas a la derecha.
+      const kx = 206;
+      const ky = mid(kx);
+      for (const [dx, dy, rot] of [
+        [20, 10, 0.5],
+        [16, 26, 0.95],
+      ] as const) {
+        ctx.save();
+        ctx.translate(kx + dx, ky + dy);
+        ctx.rotate(rot);
+        roundRect(ctx, -16, -6, 32, 12, 6);
+        ctx.fillStyle = linear(ctx, 0, -6, 0, 6, [
+          [0, '#141A16'],
+          [1, '#070A08'],
+        ]);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(238,241,232,0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      }
+      ellipse(ctx, kx + 4, ky + 6, 9, 9);
+      ctx.fillStyle = '#141A16';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(238,241,232,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      return { canvas, x: 0, y: 0, originX: 0.5, originY: BODY.baseY / BODY.h, behindFace: true };
+    }
+    case 'panuelo-mihaifit': {
+      // Pañuelo MihaiFIT: banda fina al cuello y pico corto en carbón, ribete lima fino y nombre.
+      const { canvas, ctx } = makeCanvas(230, 74);
+      ctx.beginPath();
+      ctx.moveTo(14, 10);
+      ctx.quadraticCurveTo(115, 34, 216, 10);
+      ctx.lineTo(215, 22);
+      ctx.quadraticCurveTo(170, 36, 152, 38);
+      ctx.lineTo(118, 70);
+      ctx.quadraticCurveTo(115, 73, 112, 70);
+      ctx.lineTo(78, 38);
+      ctx.quadraticCurveTo(60, 36, 15, 22);
+      ctx.closePath();
+      ctx.fillStyle = linear(ctx, 0, 10, 0, 72, [
+        [0, '#141A16'],
+        [1, '#070A08'],
+      ]);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(238,241,232,0.3)';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      // Ribete lima solo en el borde inferior del pico.
+      ctx.beginPath();
+      ctx.moveTo(84, 43);
+      ctx.lineTo(115, 69);
+      ctx.lineTo(146, 43);
+      ctx.strokeStyle = '#C9FF2F';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#EEF1E8';
+      ctx.font = '900 12px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('MihaiFIT', 115, 33);
+      return { canvas, x: 0, y: -40, originX: 0.5, originY: 0.35, behindFace: false };
+    }
     default:
       return null;
   }
