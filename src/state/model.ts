@@ -18,6 +18,33 @@ export const SLOTS = ['head', 'face', 'neck'] as const;
 export type Slot = (typeof SLOTS)[number];
 export type Equipped = Record<Slot, string | null>;
 
+/** Cuidados que pueden dar experiencia (con enfriamiento anti-spam). */
+export const CARE_KINDS = ['feed', 'clean', 'pet', 'sleep'] as const;
+export type CareKind = (typeof CARE_KINDS)[number];
+
+export const MISSION_IDS = ['care', 'hop', 'move'] as const;
+export type MissionId = (typeof MISSION_IDS)[number];
+
+/** Progreso de las misiones del día (fecha local AAAA-MM-DD). */
+export interface DailyState {
+  day: string;
+  /** Cuidados útiles hechos hoy. */
+  care: number;
+  /** Obstáculos superados hoy en MIMI HOP (acumulados entre partidas). */
+  hop: number;
+  /** Pausas de movimiento confirmadas y recompensadas hoy. */
+  move: number;
+  claimed: MissionId[];
+}
+
+export interface Stats {
+  usefulCares: number;
+  hopObstacles: number;
+  movePauses: number;
+  /** Días en los que se reclamaron las tres misiones. */
+  perfectDays: number;
+}
+
 export interface GameState {
   name: string;
   personality: PersonalityId | null;
@@ -33,6 +60,21 @@ export interface GameState {
   hopRuns: number;
   /** Última partida cuya recompensa ya se cobró: evita cobrar dos veces. */
   hopLastRewardedRun: number;
+  /* ---- v2 ---- */
+  /** Experiencia total de vínculo. El nivel se deriva de ella. */
+  xp: number;
+  /** Nivel más alto cuya recompensa ya se entregó (evita cobrarla dos veces). */
+  levelRewarded: number;
+  /** Último instante en que cada cuidado dio experiencia. */
+  careXpAt: Record<CareKind, number>;
+  daily: DailyState;
+  /** Contador de pausas de movimiento iniciadas (identificador de sesión). */
+  moveSessions: number;
+  /** Última sesión de movimiento ya resuelta (cobrada o descartada). */
+  moveLastRewarded: number;
+  /** Logros desbloqueados (permanentes). */
+  achievements: string[];
+  stats: Stats;
 }
 
 export const NEED_MIN = 0;
@@ -48,6 +90,18 @@ export function clampNeed(value: number): number {
   return Math.min(NEED_MAX, Math.max(NEED_MIN, value));
 }
 
+/** Clave de día local AAAA-MM-DD. */
+export function dayKey(now: number): string {
+  const d = new Date(now);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+export function emptyDaily(day: string): DailyState {
+  return { day, care: 0, hop: 0, move: 0, claimed: [] };
+}
+
 export function createInitialState(now: number): GameState {
   return {
     name: 'Mimi',
@@ -61,6 +115,14 @@ export function createInitialState(now: number): GameState {
     hopBest: 0,
     hopRuns: 0,
     hopLastRewardedRun: 0,
+    xp: 0,
+    levelRewarded: 1,
+    careXpAt: { feed: 0, clean: 0, pet: 0, sleep: 0 },
+    daily: emptyDaily(dayKey(now)),
+    moveSessions: 0,
+    moveLastRewarded: 0,
+    achievements: [],
+    stats: { usefulCares: 0, hopObstacles: 0, movePauses: 0, perfectDays: 0 },
   };
 }
 
@@ -70,6 +132,10 @@ export function cloneState(s: GameState): GameState {
     needs: { ...s.needs },
     owned: [...s.owned],
     equipped: { ...s.equipped },
+    careXpAt: { ...s.careXpAt },
+    daily: { ...s.daily, claimed: [...s.daily.claimed] },
+    achievements: [...s.achievements],
+    stats: { ...s.stats },
   };
 }
 

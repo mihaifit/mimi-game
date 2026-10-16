@@ -454,6 +454,64 @@ export function drawAccessory(id: string): AccessoryArt | null {
       }
       return { canvas, x: 0, y: -40, originX: 0.5, originY: 0.4, behindFace: false };
     }
+    case 'cinta': {
+      // Cinta deportiva: lienzo del tamaño del cuerpo, recortada a su silueta para que abrace la cabeza.
+      const { canvas, ctx } = makeCanvas(BODY.w, BODY.h);
+      const mid = (x: number) => 95 + ((x - 120) / 100) ** 2 * 26;
+      const band = (offset: number, thick: number) => {
+        ctx.beginPath();
+        for (let x = 0; x <= BODY.w; x += 6) ctx.lineTo(x, mid(x) + offset - thick / 2);
+        for (let x = BODY.w; x >= 0; x -= 6) ctx.lineTo(x, mid(x) + offset + thick / 2);
+        ctx.closePath();
+      };
+      ctx.save();
+      bodyPath(ctx);
+      ctx.clip();
+      band(2, 22);
+      ctx.fillStyle = 'rgba(60,30,130,0.22)'; // sombra de contacto
+      ctx.fill();
+      band(0, 20);
+      ctx.fillStyle = linear(ctx, 0, 80, 0, 125, [
+        [0, '#7ff0c8'],
+        [1, '#2fb487'],
+      ]);
+      ctx.fill();
+      band(0, 5);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      band(-6.5, 2.5);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fill();
+      ctx.restore();
+      // Nudo y cintas sueltas a la derecha.
+      const kx = 206;
+      const ky = mid(kx);
+      for (const [dx, dy, rot] of [
+        [20, 10, 0.5],
+        [16, 26, 0.95],
+      ] as const) {
+        ctx.save();
+        ctx.translate(kx + dx, ky + dy);
+        ctx.rotate(rot);
+        roundRect(ctx, -16, -6, 32, 12, 6);
+        ctx.fillStyle = linear(ctx, 0, -6, 0, 6, [
+          [0, '#7ff0c8'],
+          [1, '#2fb487'],
+        ]);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(20,90,70,0.45)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+      ellipse(ctx, kx + 4, ky + 6, 9, 9);
+      ctx.fillStyle = '#2fb487';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(20,90,70,0.45)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      return { canvas, x: 0, y: 0, originX: 0.5, originY: BODY.baseY / BODY.h, behindFace: true };
+    }
     default:
       return null;
   }

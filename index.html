@@ -14,17 +14,26 @@
       <header class="topbar">
         <h1 class="logo"><span aria-hidden="true" class="logo-dot"></span>MIMI</h1>
         <div class="status">
+          <span id="level-chip" class="chip level" title="Nivel de vínculo">Nv <strong id="level-top">1</strong></span>
           <span id="mood-chip" class="chip mood">Feliz</span>
           <span class="chip coins" title="Monedas">
             <span class="coin-icon" aria-hidden="true"></span>
             <strong id="coins">0</strong><span class="sr-only">&nbsp;monedas</span>
           </span>
+          <button id="sound-toggle" class="chip sound-toggle" type="button" aria-pressed="true" aria-label="Sonido">
+            <span class="sound-ico" aria-hidden="true">🔊</span>
+          </button>
         </div>
       </header>
 
       <main class="layout">
         <section class="stage-wrap" aria-label="Escena de juego">
           <div id="stage" class="stage" role="img" aria-label="Mimi en su habitación"></div>
+          <p id="speech" class="speech" aria-hidden="true"></p>
+          <div id="celebrate" class="celebrate" hidden>
+            <p class="celebrate-title" id="celebrate-title">¡Nivel 2!</p>
+            <p class="celebrate-text" id="celebrate-text"></p>
+          </div>
           <div id="hop-over" class="hop-over" hidden>
             <div class="hop-card" role="group" aria-labelledby="hop-over-title">
               <h2 id="hop-over-title">¡Fin de la partida!</h2>
@@ -42,12 +51,22 @@
         <section id="panel" class="panel" tabindex="-1">
           <div class="tabs" role="tablist" aria-label="Secciones">
             <button class="tab" role="tab" id="tab-room" aria-controls="panel-room" aria-selected="true" type="button">Habitación</button>
+            <button class="tab" role="tab" id="tab-missions" aria-controls="panel-missions" aria-selected="false" tabindex="-1" type="button">Misiones<span id="missions-badge" class="badge" hidden></span></button>
             <button class="tab" role="tab" id="tab-shop" aria-controls="panel-shop" aria-selected="false" tabindex="-1" type="button">Tienda</button>
             <button class="tab" role="tab" id="tab-hop" aria-controls="panel-hop" aria-selected="false" tabindex="-1" type="button">MIMI HOP</button>
+            <button class="tab" role="tab" id="tab-move" aria-controls="panel-move" aria-selected="false" tabindex="-1" type="button">Moverse</button>
             <button class="tab" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1" type="button">Ajustes</button>
           </div>
 
           <div class="tabpanel" role="tabpanel" id="panel-room" aria-labelledby="tab-room">
+            <div class="bond">
+              <div class="bond-head">
+                <span id="bond-label">Vínculo · nivel <strong id="level">1</strong></span>
+                <span id="xp-text" class="bond-xp">0 / 30 XP</span>
+              </div>
+              <div id="xp-bar" class="bar xp" role="progressbar" aria-labelledby="bond-label" aria-valuemin="0" aria-valuemax="30" aria-valuenow="0"><span></span></div>
+              <p id="bond-next" class="bond-next"></p>
+            </div>
             <p id="hint" class="hint"></p>
             <ul id="needs" class="needs" aria-label="Necesidades"></ul>
             <div class="actions">
@@ -56,7 +75,15 @@
               <button class="btn action" data-action="sleep" type="button"><span class="ico ico-sleep" aria-hidden="true"></span><span class="label">Dormir</span></button>
               <button class="btn action" data-action="pet" type="button"><span class="ico ico-pet" aria-hidden="true"></span>Caricias</button>
             </div>
-            <p class="tip">Consejo: también puedes tocar a Mimi para darle caricias.</p>
+            <p class="tip">Consejo: toca a Mimi para darle caricias. Cada cuidado da experiencia cuando Mimi de verdad lo necesita (como mucho una vez cada 45 s por tipo).</p>
+          </div>
+
+          <div class="tabpanel" role="tabpanel" id="panel-missions" aria-labelledby="tab-missions" hidden>
+            <h2 class="section-title">Misiones de hoy</h2>
+            <p class="lead">Se renuevan cada día según la fecha de tu dispositivo. Sin prisas: si un día no juegas, no pasa nada.</p>
+            <ul id="missions" class="missions"></ul>
+            <h2 class="section-title">Logros</h2>
+            <ul id="achievements" class="achievements"></ul>
           </div>
 
           <div class="tabpanel" role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden>
@@ -78,7 +105,47 @@
             </ul>
           </div>
 
+          <div class="tabpanel" role="tabpanel" id="panel-move" aria-labelledby="tab-move" hidden>
+            <h2 class="section-title">Pausa activa con Mimi</h2>
+            <p class="lead">Un momento corto para moverte junto a Mimi, como te resulte cómodo: estírate, camina por casa, mueve los hombros o baila un poco. Si algo te molesta, para.</p>
+            <div class="durations" role="radiogroup" aria-label="Duración de la pausa">
+              <button class="btn duration" type="button" role="radio" aria-checked="true" data-minutes="1">1 minuto</button>
+              <button class="btn duration" type="button" role="radio" aria-checked="false" data-minutes="2">2 minutos</button>
+            </div>
+            <div class="move-clock-wrap">
+              <div id="move-ring" class="move-ring" aria-hidden="true"></div>
+              <div id="move-clock" class="move-clock" role="timer" aria-label="Tiempo restante">1:00</div>
+            </div>
+            <p id="move-tip" class="move-tip" aria-live="polite">Elige la duración y pulsa Empezar.</p>
+            <div id="move-controls" class="row move-controls">
+              <button id="move-start" class="btn primary" type="button">Empezar</button>
+              <button id="move-pause" class="btn" type="button" hidden>Pausar</button>
+              <button id="move-cancel" class="btn" type="button" hidden>Cancelar</button>
+            </div>
+            <div id="move-confirm" class="move-confirm" hidden>
+              <p><strong>¡Tiempo!</strong> ¿Has hecho tu pausa?</p>
+              <div class="row">
+                <button id="move-yes" class="btn primary" type="button">Sí, la he hecho</button>
+                <button id="move-no" class="btn" type="button">Ahora no</button>
+              </div>
+            </div>
+            <p id="move-status" class="notice ok"></p>
+            <p class="fineprint">Registro <strong>manual y local</strong>: MIMI no se conecta a ninguna cuenta, sensor, podómetro, reloj ni entrenamiento, y no cuenta pasos ni calorías. Solo cuenta lo que tú confirmas, y se guarda únicamente en este navegador. Si cambias de app o de pestaña, la pausa se detiene.</p>
+            <div class="mihaifit">
+              <p>¿Te apetece moverte más? Conoce <strong>MihaiFIT</strong>.</p>
+              <a class="btn" href="https://www.mihaifit.es/" target="_blank" rel="noopener noreferrer">Visitar mihaifit.es<span class="sr-only"> (se abre en otra pestaña)</span> ↗</a>
+              <p class="fineprint">Se abre la web de MihaiFIT en otra pestaña. MIMI no envía ningún dato tuyo.</p>
+            </div>
+          </div>
+
           <div class="tabpanel" role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden>
+            <fieldset class="field">
+              <legend>Sonido</legend>
+              <label class="check"><input id="sound-check" type="checkbox" checked /> Efectos de sonido</label>
+              <label class="range" for="volume">Volumen</label>
+              <input id="volume" type="range" min="0" max="100" step="5" value="50" />
+              <p class="fineprint">Sonidos cortos generados en el navegador. Solo suenan después de que toques o pulses algo; no hay música automática.</p>
+            </fieldset>
             <form id="name-form" class="field">
               <label for="name-input">Nombre de tu mascota</label>
               <div class="row">
@@ -97,7 +164,7 @@
       </main>
 
       <footer class="footer">
-        <p>MIMI es un proyecto independiente sin anuncios ni pagos. Tu progreso se guarda solo en este navegador.</p>
+        <p>MIMI 0.2 es un proyecto independiente sin anuncios ni pagos. Tu progreso se guarda solo en este navegador.</p>
       </footer>
     </div>
 

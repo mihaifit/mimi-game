@@ -1,19 +1,28 @@
 import {
+  CARE_KINDS,
   MAX_COINS,
+  MISSION_IDS,
   MAX_NAME_LENGTH,
   NEED_KEYS,
   PERSONALITY_IDS,
   SLOTS,
   clampNeed,
   createInitialState,
+  dayKey,
+  emptyDaily,
+  type DailyState,
   type GameState,
+  type MissionId,
   type PersonalityId,
 } from './model';
+import { ACHIEVEMENT_IDS, MAX_XP, levelOf } from './progress';
 import { findItem } from './shop';
 
 export const SAVE_KEY = 'mimi-game.save';
 export const BACKUP_KEY = 'mimi-game.save.backup';
-export const SAVE_VERSION = 1;
+/** Copia intacta del guardado v1 que se hace una sola vez antes de migrarlo. */
+export const V1_BACKUP_KEY = 'mimi-game.save.v1';
+export const SAVE_VERSION = 2;
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -21,7 +30,7 @@ export interface StorageLike {
   removeItem(key: string): void;
 }
 
-export type LoadStatus = 'new' | 'loaded' | 'corrupt' | 'unsupported-version' | 'unavailable';
+export type LoadStatus = 'new' | 'loaded' | 'migrated' | 'corrupt' | 'unsupported-version' | 'unavailable';
 
 export interface LoadResult {
   state: GameState;
@@ -72,8 +81,23 @@ export function sanitizeState(raw: unknown, now: number): GameState | null {
       ? (raw.personality as PersonalityId)
       : null;
 
+  // v2 (campos ausentes en v1 → valores por defecto: migración aditiva).
+  const xp = int(raw.xp, 0, MAX_XP, 0);
+  const level = levelOf(xp);
+  // Si falta, se asume que los niveles ya alcanzados están pagados (nunca se paga doble).
+  const levelRewarded = int(raw.levelRewarded, 1, level, level);
+
   const owned = Array.isArray(raw.owned)
-    ? [...new Set(raw.owned.filter((id): id is string => typeof id === 'string' && !!findItem(id)))]
+    ? [
+        ...new Set(
+          raw.owned.filter((id): id is string => {
+            if (typeof id !== 'string') return false;
+            const item = findItem(id);
+            // Los regalos de nivel solo valen si ese nivel se alcanzó.
+            return !!item && (!item.unlockLevel || levelRewarded >= item.unlockLevel);
+          }),
+        ),
+      ]
     : [];
 
   const equipped = { ...base.equipped };
@@ -95,6 +119,17 @@ export function sanitizeState(raw: unknown, now: number): GameState | null {
 
   const hopRuns = int(raw.hopRuns, 0, Number.MAX_SAFE_INTEGER, 0);
 
+  const careXpAt = { ...base.careXpAt };
+  if (isRecord(raw.careXpAt)) {
+    for (const k of CARE_KINDS) careXpAt[k] = int(raw.careXpAt[k], 0, now, 0);
+  }
+
+  const moveSessions = int(raw.moveSessions, 0, Number.MAX_SAFE_INTEGER, 0);
+  const statsRaw = isRecord(raw.stats) ? raw.stats : {};
+  const achievements = Array.isArray(raw.achievements)
+    ? [...new Set(raw.achievements.filter((id): id is string => typeof id === 'string' && ACHIEVEMENT_IDS.includes(id)))]
+    : [];
+
   return {
     name,
     personality,
@@ -107,6 +142,36 @@ export function sanitizeState(raw: unknown, now: number): GameState | null {
     hopBest: int(raw.hopBest, 0, 1_000_000, 0),
     hopRuns,
     hopLastRewardedRun: int(raw.hopLastRewardedRun, 0, hopRuns, hopRuns),
+    xp,
+    levelRewarded,
+    careXpAt,
+    daily: sanitizeDaily(raw.daily, now),
+    moveSessions,
+    moveLastRewarded: int(raw.moveLastRewarded, 0, moveSessions, moveSessions),
+    achievements,
+    stats: {
+      usefulCares: int(statsRaw.usefulCares, 0, 1_000_000, 0),
+      hopObstacles: int(statsRaw.hopObstacles, 0, 1_000_000_000, 0),
+      movePauses: int(statsRaw.movePauses, 0, 1_000_000, 0),
+      perfectDays: int(statsRaw.perfectDays, 0, 1_000_000, 0),
+    },
+  };
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function sanitizeDaily(raw: unknown, now: number): DailyState {
+  if (!isRecord(raw) || typeof raw.day !== 'string' || !DAY_RE.test(raw.day)) return emptyDaily(dayKey(now));
+  // Un día guardado en el futuro (reloj atrasado ahora) se conserva: así no se renuevan ni duplican premios.
+  const claimed = Array.isArray(raw.claimed)
+    ? [...new Set(raw.claimed.filter((id): id is MissionId => typeof id === 'string' && (MISSION_IDS as readonly string[]).includes(id)))]
+    : [];
+  return {
+    day: raw.day,
+    care: int(raw.care, 0, 999, 0),
+    hop: int(raw.hop, 0, 999, 0),
+    move: int(raw.move, 0, 999, 0),
+    claimed,
   };
 }
 
@@ -127,7 +192,7 @@ export function loadGame(storage: StorageLike | null, now: number): LoadResult {
     backup(storage, text);
     return { state: createInitialState(now), status: 'corrupt' };
   }
-  if (!isRecord(parsed) || typeof parsed.version !== 'number') {
+  if (!isRecord(parsed) || typeof parsed.version !== 'number' || !Number.isInteger(parsed.version) || parsed.version < 1) {
     backup(storage, text);
     return { state: createInitialState(now), status: 'corrupt' };
   }
@@ -139,6 +204,15 @@ export function loadGame(storage: StorageLike | null, now: number): LoadResult {
   if (!state) {
     backup(storage, text);
     return { state: createInitialState(now), status: 'corrupt' };
+  }
+  if (parsed.version < SAVE_VERSION) {
+    // Migración aditiva: se conserva una copia exacta del guardado antiguo (solo la primera vez).
+    try {
+      if (storage.getItem(V1_BACKUP_KEY) === null) storage.setItem(V1_BACKUP_KEY, text);
+    } catch {
+      /* sin espacio: la migración sigue igualmente */
+    }
+    return { state, status: 'migrated' };
   }
   return { state, status: 'loaded' };
 }

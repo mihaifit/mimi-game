@@ -9,6 +9,7 @@ import {
   type PersonalityId,
 } from './model';
 import { personalityOf } from './personality';
+import { addXp, grantCareXp } from './progress';
 
 export interface ActionResult {
   state: GameState;
@@ -69,6 +70,10 @@ export function advance(state: GameState, now: number): GameState {
   return next;
 }
 
+function extras(coin: boolean, xp: number): string {
+  return `${coin ? ' +1 moneda' : ''}${xp > 0 ? ` +${xp} XP` : ''}`;
+}
+
 function careCoin(state: GameState, before: number): boolean {
   if (before < CARE_COIN_THRESHOLD) {
     addCoins(state, 1);
@@ -77,7 +82,8 @@ function careCoin(state: GameState, before: number): boolean {
   return false;
 }
 
-export function feed(state: GameState): ActionResult {
+// `now` es por defecto state.lastTick: el Store siempre aplica advance(now) antes de la acción.
+export function feed(state: GameState, now = state.lastTick): ActionResult {
   if (state.sleeping) return { state, ok: false, message: `${state.name} está dormida. Despiértala para comer.` };
   if (state.needs.hunger >= 95) return { state, ok: false, message: `${state.name} no tiene hambre ahora.` };
   const p = personalityOf(state.personality);
@@ -86,19 +92,21 @@ export function feed(state: GameState): ActionResult {
   next.needs.hygiene = clampNeed(state.needs.hygiene - 4);
   next.needs.affection = clampNeed(state.needs.affection + p.feedAffection);
   const coin = careCoin(next, state.needs.hunger);
-  return { state: next, ok: true, message: `¡Ñam! A ${state.name} le encanta la gelatina de fresa.${coin ? ' +1 moneda' : ''}` };
+  const xp = grantCareXp(next, 'feed', state.needs.hunger, now);
+  return { state: next, ok: true, message: `¡Ñam! A ${state.name} le encanta la gelatina de fresa.${extras(coin, xp)}` };
 }
 
-export function clean(state: GameState): ActionResult {
+export function clean(state: GameState, now = state.lastTick): ActionResult {
   if (state.sleeping) return { state, ok: false, message: `${state.name} está dormida. Mejor el baño luego.` };
   if (state.needs.hygiene >= 95) return { state, ok: false, message: `${state.name} ya está reluciente.` };
   const next = cloneState(state);
   next.needs.hygiene = clampNeed(state.needs.hygiene + CLEAN_GAIN);
   const coin = careCoin(next, state.needs.hygiene);
-  return { state: next, ok: true, message: `¡Burbujas! ${state.name} brilla de limpia.${coin ? ' +1 moneda' : ''}` };
+  const xp = grantCareXp(next, 'clean', state.needs.hygiene, now);
+  return { state: next, ok: true, message: `¡Burbujas! ${state.name} brilla de limpia.${extras(coin, xp)}` };
 }
 
-export function pet(state: GameState): ActionResult {
+export function pet(state: GameState, now = state.lastTick): ActionResult {
   const next = cloneState(state);
   if (state.sleeping) {
     next.needs.affection = clampNeed(state.needs.affection + PET_SLEEPING_GAIN);
@@ -107,10 +115,11 @@ export function pet(state: GameState): ActionResult {
   const p = personalityOf(state.personality);
   next.needs.affection = clampNeed(state.needs.affection + PET_GAIN * p.petBoost);
   const coin = careCoin(next, state.needs.affection);
-  return { state: next, ok: true, message: `${state.name} tiembla de felicidad.${coin ? ' +1 moneda' : ''}` };
+  const xp = grantCareXp(next, 'pet', state.needs.affection, now);
+  return { state: next, ok: true, message: `${state.name} tiembla de felicidad.${extras(coin, xp)}` };
 }
 
-export function toggleSleep(state: GameState): ActionResult {
+export function toggleSleep(state: GameState, now = state.lastTick): ActionResult {
   const next = cloneState(state);
   if (state.sleeping) {
     next.sleeping = false;
@@ -118,8 +127,9 @@ export function toggleSleep(state: GameState): ActionResult {
   }
   if (state.needs.energy >= 90) return { state, ok: false, message: `${state.name} no tiene sueño todavía.` };
   next.sleeping = true;
-  if (state.needs.energy < CARE_COIN_THRESHOLD) careCoin(next, state.needs.energy);
-  return { state: next, ok: true, message: `Buenas noches, ${state.name}. Zzz…` };
+  const coin = state.needs.energy < CARE_COIN_THRESHOLD && careCoin(next, state.needs.energy);
+  const xp = grantCareXp(next, 'sleep', state.needs.energy, now);
+  return { state: next, ok: true, message: `Buenas noches, ${state.name}. Zzz…${extras(coin, xp)}` };
 }
 
 export function choosePersonality(state: GameState, id: PersonalityId): ActionResult {
@@ -148,9 +158,17 @@ export function hopCoinsFor(score: number, personality: PersonalityId | null): n
   return Math.min(HOP_MAX_COINS, Math.floor(base * personalityOf(personality).hopCoinBoost));
 }
 
+/** XP de una partida: 2 + 1 por cada 2 puntos, máximo 15. */
+export const HOP_MAX_XP = 15;
+export function hopXpFor(score: number): number {
+  const safe = Math.max(0, Math.floor(Number.isFinite(score) ? score : 0));
+  return Math.min(HOP_MAX_XP, 2 + Math.floor(safe / 2));
+}
+
 export interface HopReward {
   state: GameState;
   coins: number;
+  xp: number;
   newRecord: boolean;
   alreadyClaimed: boolean;
 }
@@ -158,7 +176,7 @@ export interface HopReward {
 /** Cobra la recompensa de una partida terminada. Solo una vez por runId. */
 export function claimHopReward(state: GameState, runId: number, score: number): HopReward {
   if (!Number.isInteger(runId) || runId <= state.hopLastRewardedRun || runId > state.hopRuns) {
-    return { state, coins: 0, newRecord: false, alreadyClaimed: true };
+    return { state, coins: 0, xp: 0, newRecord: false, alreadyClaimed: true };
   }
   const safeScore = Math.max(0, Math.floor(Number.isFinite(score) ? score : 0));
   const next = cloneState(state);
@@ -169,5 +187,10 @@ export function claimHopReward(state: GameState, runId: number, score: number): 
   if (newRecord) next.hopBest = safeScore;
   next.needs.energy = clampNeed(state.needs.energy - HOP_ENERGY_COST);
   next.needs.affection = clampNeed(state.needs.affection + HOP_AFFECTION_GAIN);
-  return { state: next, coins, newRecord, alreadyClaimed: false };
+  const xp = hopXpFor(safeScore);
+  addXp(next, xp);
+  // Los obstáculos cuentan para la misión del día (el Store renueva el día antes de llamar).
+  next.daily.hop = Math.min(999, state.daily.hop + Math.min(safeScore, 999));
+  next.stats.hopObstacles = Math.min(1_000_000_000, state.stats.hopObstacles + safeScore);
+  return { state: next, coins, xp, newRecord, alreadyClaimed: false };
 }
