@@ -94,13 +94,19 @@ if (V1_URL) {
       hopLastRewardedRun: 2,
     },
   };
-  // Se inyecta desde un recurso del mismo origen sin la app: si la app estuviera abierta,
-  // su guardado al salir (pagehide) pisaría el v1 inyectado.
-  await page.goto(new globalThis.URL('favicon.svg', URL).href);
+  // Se inyecta desde una página auxiliar del MISMO origen, sin la app: si la app estuviera
+  // abierta, su guardado al salir (pagehide) pisaría el v1 inyectado. La página la sirve
+  // page.route (no existe en el servidor) y declara un icono vacío para que el navegador
+  // no pida /favicon.ico; así no hay peticiones auxiliares que den 404.
+  const seedUrl = new globalThis.URL('__mimi-smoke-seed__.html', URL).href;
+  const seedHtml = '<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"></head><body></body></html>';
+  await page.route(seedUrl, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: seedHtml }));
+  await page.goto(seedUrl);
   await page.evaluate((s) => {
     localStorage.clear();
     localStorage.setItem('mimi-game.save', JSON.stringify(s));
   }, v1);
+  await page.unroute(seedUrl);
 }
 
 // 2) Abrir 0.2: migración.
