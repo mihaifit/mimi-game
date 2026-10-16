@@ -8,6 +8,12 @@ import { addXp, ensureDay } from './progress';
 export const MOVE_DURATIONS_MIN = [1, 2] as const;
 export type MoveMinutes = (typeof MOVE_DURATIONS_MIN)[number];
 
+/** Retos MihaiFIT: nombres amigables de las dos pausas (misma duración y reglas). */
+export const MOVE_CHALLENGES: Record<MoveMinutes, string> = {
+  1: 'Activa tu día',
+  2: 'Hoy toca moverse',
+};
+
 /** Pausas recompensadas por día. Después se puede seguir usando sin premio. */
 export const MOVE_DAILY_LIMIT = 2;
 export const MOVE_COINS = 5;
@@ -101,7 +107,7 @@ export function confirmMove(state: GameState, t: MoveTimer, now: number): MoveCl
       state: next,
       ok: true,
       rewarded: false,
-      message: `¡Gracias por moverte! Hoy ya recibiste las ${MOVE_DAILY_LIMIT} recompensas de movimiento.`,
+      message: `¡Reto registrado! Hoy ya recibiste las ${MOVE_DAILY_LIMIT} recompensas de retos.`,
       coins: 0,
       xp: 0,
     };
@@ -113,7 +119,7 @@ export function confirmMove(state: GameState, t: MoveTimer, now: number): MoveCl
     state: next,
     ok: true,
     rewarded: true,
-    message: `¡Pausa registrada! +${MOVE_COINS} monedas y +${MOVE_XP} XP.`,
+    message: `¡Reto registrado! +${MOVE_COINS} monedas y +${MOVE_XP} XP.`,
     coins: MOVE_COINS,
     xp: MOVE_XP,
   };

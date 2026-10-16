@@ -167,8 +167,19 @@ await page.click('[data-mission="care"]', { force: true }).catch(() => undefined
 check('no se puede reclamar dos veces', (await state(page)).coins === claimed.coins);
 await shot(page, '03-misiones');
 
-// 6) Movimiento: empezar, pausar, segundo plano, continuar, confirmar una vez.
+// 6) Retos MihaiFIT: empezar, pausar, segundo plano, continuar, confirmar una vez.
 await tab(page, 'move');
+check('sección «Retos MihaiFIT»', /Retos MihaiFIT/.test((await page.textContent('#panel-move .section-title')) ?? ''));
+const challengeNames = await page.$$eval('.duration .d-name', (els) => els.map((e) => e.textContent));
+check('retos «Activa tu día» (1 min) y «Hoy toca moverse» (2 min)', challengeNames.join('|') === 'Activa tu día|Hoy toca moverse', challengeNames.join(' / '));
+await page.click('.duration[data-minutes="2"]');
+check('«Hoy toca moverse» = 2:00', (await page.textContent('#move-clock')) === '2:00');
+await page.click('.duration[data-minutes="1"]');
+check('«Activa tu día» = 1:00', (await page.textContent('#move-clock')) === '1:00');
+// Condición de prueba: 2 retos ya confirmados antes; este será el 3.º (desbloquea el Pañuelo MihaiFIT).
+await page.evaluate(() => window.__mimi.store.update((s) => ({ ...s, stats: { ...s.stats, movePauses: 2 } })));
+check('pañuelo bloqueado antes del 3.er reto', !(await state(page)).owned.includes('panuelo-mihaifit'));
+await shot(page, '04a-retos-mihaifit');
 await page.click('#move-start');
 await page.waitForTimeout(2200);
 await page.click('#move-pause');
@@ -209,6 +220,11 @@ check(
   `${coinsMove} → ${moved.coins}`,
 );
 check('confirmación oculta tras cobrar', !(await page.isVisible('#move-confirm')));
+check(
+  '3.er reto confirmado: Pañuelo MihaiFIT regalado una vez',
+  moved.owned.filter((id) => id === 'panuelo-mihaifit').length === 1 && moved.achievements.includes('retos-3'),
+  `pausas ${moved.stats.movePauses} · cuello ${moved.equipped.neck}`,
+);
 const fineprint = await page.textContent('#panel-move .fineprint');
 check('aviso de registro manual/local visible', /manual y local/.test(fineprint ?? ''));
 const href = await page.getAttribute('.mihaifit a', 'href');
@@ -261,9 +277,21 @@ const lv = await state(page);
 check('nivel 3: cinta regalada una vez', lv.owned.includes('cinta') && lv.levelRewarded >= 3);
 check('celebración visible', await page.isVisible('#celebrate'));
 await shot(page, '08-nivel-celebracion');
-await page.evaluate(() => window.__mimi.store.update((s) => ({ ...s, equipped: { ...s.equipped, head: 'cinta' } })));
+await page.evaluate(() =>
+  window.__mimi.store.update((s) => ({ ...s, equipped: { ...s.equipped, head: 'cinta', neck: 'panuelo-mihaifit' } })),
+);
 await page.waitForTimeout(2500);
-await shot(page, '09-cinta-deportiva');
+const worn = await state(page);
+check('Cinta y Pañuelo MihaiFIT equipados a la vez', worn.equipped.head === 'cinta' && worn.equipped.neck === 'panuelo-mihaifit');
+await shot(page, '09-accesorios-mihaifit');
+await page.locator('#stage').screenshot({ path: join(SHOTS, '09b-accesorios-zoom.png') });
+await tab(page, 'hop');
+await page.waitForTimeout(900);
+check('MIMI HOP activo con los accesorios', await page.evaluate(() => window.__mimi.game.scene.isActive('hop')));
+await page.locator('#stage').screenshot({ path: join(SHOTS, '09c-hop-accesorios.png') });
+await tab(page, 'move');
+await page.locator('.mihaifit').scrollIntoViewIfNeeded();
+await shot(page, '09d-capsula-mihaifit');
 
 /* ------------------------------------------------------------ escritorio */
 const desk = await browser.newContext({ viewport: { width: 1280, height: 860 } });
@@ -279,7 +307,7 @@ await dpage.waitForTimeout(800);
 await shot(dpage, '10-escritorio');
 await tab(dpage, 'move');
 await dpage.waitForTimeout(300);
-await shot(dpage, '11-escritorio-moverse');
+await shot(dpage, '11-escritorio-retos');
 
 const allErrors = [...errors, ...derrors];
 check('sin errores de consola ni de página', allErrors.length === 0, allErrors.slice(0, 5).join(' | '));

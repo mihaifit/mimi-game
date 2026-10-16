@@ -63,6 +63,10 @@ export function levelReward(level: number): number {
 /** Accesorio deportivo que se regala al llegar a este nivel. */
 export const SPORT_ITEM_ID = 'cinta';
 export const SPORT_ITEM_LEVEL = 3;
+/** Pañuelo MihaiFIT: regalo del logro de 3 retos (pausas) confirmados. */
+export const SCARF_ITEM_ID = 'panuelo-mihaifit';
+export const SCARF_ACHIEVEMENT_ID = 'retos-3';
+export const SCARF_PAUSES = 3;
 
 export function addXp(state: GameState, amount: number): void {
   if (!Number.isFinite(amount) || amount <= 0) return;
@@ -138,7 +142,7 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
   move: {
     id: 'move',
     title: 'Momento de movimiento',
-    description: 'Haz una pausa activa corta en la sección Moverse y confírmala.',
+    description: 'Completa un reto MihaiFIT (pausa activa corta) y confírmalo.',
     goal: 1,
     coins: 10,
     xp: 20,
@@ -215,7 +219,14 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'cuidadora', title: 'Cuidadora constante', description: 'Haz 25 cuidados útiles.', coins: 15, progress: (s) => [s.stats.usefulCares, 25] },
   { id: 'saltarina', title: 'Saltarina', description: 'Consigue 10 puntos en una partida de MIMI HOP.', coins: 10, progress: (s) => [s.hopBest, 10] },
   { id: 'vinculo-3', title: 'Lazos fuertes', description: 'Llega al nivel 3 de vínculo.', coins: 10, progress: (s) => [levelOf(s.xp), 3] },
-  { id: 'en-marcha', title: 'En marcha', description: 'Completa tu primera pausa de movimiento.', coins: 10, progress: (s) => [s.stats.movePauses, 1] },
+  { id: 'en-marcha', title: 'En marcha', description: 'Completa tu primer reto MihaiFIT.', coins: 10, progress: (s) => [s.stats.movePauses, 1] },
+  {
+    id: SCARF_ACHIEVEMENT_ID,
+    title: 'Hoy toca.',
+    description: `Confirma ${SCARF_PAUSES} retos MihaiFIT. Regalo: Pañuelo MihaiFIT.`,
+    coins: 10,
+    progress: (s) => [s.stats.movePauses, SCARF_PAUSES],
+  },
   { id: 'dia-redondo', title: 'Día redondo', description: 'Reclama las tres misiones de un mismo día.', coins: 15, progress: (s) => [s.stats.perfectDays, 1] },
   { id: 'coleccion', title: 'Coleccionista', description: 'Consigue 3 accesorios.', coins: 10, progress: (s) => [s.owned.length, 3] },
 ];
@@ -226,7 +237,12 @@ export const ACHIEVEMENT_IDS = ACHIEVEMENTS.map((a) => a.id);
 
 export type ProgressEvent =
   | { type: 'levelup'; level: number; coins: number; gift: string | null }
-  | { type: 'achievement'; id: string; title: string; coins: number };
+  | { type: 'achievement'; id: string; title: string; coins: number; gift: string | null };
+
+/** Accesorios que regala un logro (se entregan una sola vez, al desbloquearlo). */
+export const ACHIEVEMENT_GIFTS: Record<string, { item: string; slot: 'head' | 'face' | 'neck' }> = {
+  [SCARF_ACHIEVEMENT_ID]: { item: SCARF_ITEM_ID, slot: 'neck' },
+};
 
 /**
  * Entrega las recompensas pendientes de nivel y logros. Idempotente: llamarla
@@ -258,6 +274,10 @@ export function settle(state: GameState): { state: GameState; events: ProgressEv
   // Red de seguridad: si alguien llegó al nivel sin recibir el regalo (p. ej. datos editados).
   const cur = next ?? state;
   if (cur.levelRewarded >= SPORT_ITEM_LEVEL && !cur.owned.includes(SPORT_ITEM_ID)) edit().owned.push(SPORT_ITEM_ID);
+  for (const [ach, g] of Object.entries(ACHIEVEMENT_GIFTS)) {
+    const s = next ?? state;
+    if (s.achievements.includes(ach) && !s.owned.includes(g.item)) edit().owned.push(g.item);
+  }
 
   for (const a of ACHIEVEMENTS) {
     const s = next ?? state;
@@ -267,7 +287,14 @@ export function settle(state: GameState): { state: GameState; events: ProgressEv
     const e = edit();
     e.achievements.push(a.id);
     addCoinsTo(e, a.coins);
-    events.push({ type: 'achievement', id: a.id, title: a.title, coins: a.coins });
+    const g = ACHIEVEMENT_GIFTS[a.id];
+    let gift: string | null = null;
+    if (g && !e.owned.includes(g.item)) {
+      e.owned.push(g.item);
+      if (!e.equipped[g.slot]) e.equipped[g.slot] = g.item;
+      gift = g.item;
+    }
+    events.push({ type: 'achievement', id: a.id, title: a.title, coins: a.coins, gift });
   }
   return { state: next ?? state, events };
 }

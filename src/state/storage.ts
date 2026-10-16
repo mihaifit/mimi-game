@@ -87,14 +87,20 @@ export function sanitizeState(raw: unknown, now: number): GameState | null {
   // Si falta, se asume que los niveles ya alcanzados están pagados (nunca se paga doble).
   const levelRewarded = int(raw.levelRewarded, 1, level, level);
 
+  const achievements = Array.isArray(raw.achievements)
+    ? [...new Set(raw.achievements.filter((id): id is string => typeof id === 'string' && ACHIEVEMENT_IDS.includes(id)))]
+    : [];
+
   const owned = Array.isArray(raw.owned)
     ? [
         ...new Set(
           raw.owned.filter((id): id is string => {
             if (typeof id !== 'string') return false;
             const item = findItem(id);
-            // Los regalos de nivel solo valen si ese nivel se alcanzó.
-            return !!item && (!item.unlockLevel || levelRewarded >= item.unlockLevel);
+            // Los regalos solo valen si se alcanzó su nivel o su logro.
+            if (!item) return false;
+            if (item.unlockLevel && levelRewarded < item.unlockLevel) return false;
+            return !item.unlockAchievement || achievements.includes(item.unlockAchievement);
           }),
         ),
       ]
@@ -126,9 +132,6 @@ export function sanitizeState(raw: unknown, now: number): GameState | null {
 
   const moveSessions = int(raw.moveSessions, 0, Number.MAX_SAFE_INTEGER, 0);
   const statsRaw = isRecord(raw.stats) ? raw.stats : {};
-  const achievements = Array.isArray(raw.achievements)
-    ? [...new Set(raw.achievements.filter((id): id is string => typeof id === 'string' && ACHIEVEMENT_IDS.includes(id)))]
-    : [];
 
   return {
     name,

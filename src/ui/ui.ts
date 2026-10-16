@@ -29,6 +29,7 @@ import {
   type PersonalityId,
 } from '../state/model';
 import {
+  MOVE_CHALLENGES,
   MOVE_COINS,
   MOVE_DAILY_LIMIT,
   MOVE_XP,
@@ -48,6 +49,7 @@ import { savePrefs } from '../state/prefs';
 import {
   ACHIEVEMENTS,
   MISSIONS,
+  SCARF_PAUSES,
   SPORT_ITEM_LEVEL,
   claimMission,
   levelProgress,
@@ -172,7 +174,9 @@ export class UI {
       this.toast(`¡${this.store.state.name} sube a nivel ${e.level}! ${text}`);
     } else {
       this.sfx.play('claim');
-      this.toast(`Logro «${e.title}»: +${e.coins} monedas.`);
+      const gift = e.gift ? findItem(e.gift) : undefined;
+      this.toast(`Logro «${e.title}»: +${e.coins} monedas.${gift ? ` ¡${gift.name} desbloqueado!` : ''}`);
+      if (gift) this.celebrate('¡Regalo MihaiFIT!', `${gift.name} · +${e.coins} monedas`);
     }
   }
 
@@ -232,7 +236,7 @@ export class UI {
     $('xp-text').textContent = lp.needed ? `${lp.into} / ${lp.needed} XP` : 'Nivel máximo';
     $('bond-next').textContent =
       lp.level < SPORT_ITEM_LEVEL
-        ? `Regalo en el nivel ${SPORT_ITEM_LEVEL}: cinta deportiva. Cada nivel da monedas.`
+        ? `Regalo en el nivel ${SPORT_ITEM_LEVEL}: Cinta MihaiFIT. Cada nivel da monedas.`
         : lp.needed
           ? `Faltan ${lp.needed - lp.into} XP para el nivel ${lp.level + 1} (+${10 + (lp.level + 1) * 2} monedas).`
           : '¡Vínculo máximo!';
@@ -273,9 +277,10 @@ export class UI {
     for (const item of SHOP_ITEMS) {
       const owned = s.owned.includes(item.id);
       const equipped = s.equipped[item.slot] === item.id;
-      const locked = !owned && !!item.unlockLevel;
+      const giftOnly = !!item.unlockLevel || !!item.unlockAchievement;
+      const locked = !owned && giftOnly;
       const li = document.createElement('li');
-      li.className = `shop-item${equipped ? ' equipped' : ''}${locked ? ' locked' : ''}${item.unlockLevel ? ' gift' : ''}`;
+      li.className = `shop-item${equipped ? ' equipped' : ''}${locked ? ' locked' : ''}${giftOnly ? ' gift' : ''}`;
       const thumb = document.createElement('div');
       thumb.className = 'shop-thumb';
       const art = drawAccessory(item.id);
@@ -289,7 +294,11 @@ export class UI {
       name.textContent = item.name;
       const meta = document.createElement('div');
       meta.className = 'shop-meta';
-      const price = item.unlockLevel ? `Regalo del nivel ${item.unlockLevel}` : `${item.price} monedas`;
+      const price = item.unlockLevel
+        ? `Regalo del nivel ${item.unlockLevel}`
+        : item.unlockAchievement
+          ? `Regalo: ${SCARF_PAUSES} retos MihaiFIT (${Math.min(s.stats.movePauses, SCARF_PAUSES)}/${SCARF_PAUSES})`
+          : `${item.price} monedas`;
       meta.textContent = `${SLOT_LABELS[item.slot]} · ${owned ? (equipped ? 'Puesto' : 'Tuyo') : price}`;
       info.append(name, meta);
       const btn = document.createElement('button');
@@ -305,8 +314,13 @@ export class UI {
         });
       } else if (locked) {
         btn.className = 'btn';
-        btn.textContent = `🔒 Nivel ${item.unlockLevel}`;
-        btn.setAttribute('aria-label', `${item.name}: se desbloquea en el nivel ${item.unlockLevel} (tu nivel: ${level})`);
+        btn.textContent = item.unlockLevel ? `🔒 Nivel ${item.unlockLevel}` : `🔒 ${SCARF_PAUSES} retos`;
+        btn.setAttribute(
+          'aria-label',
+          item.unlockLevel
+            ? `${item.name}: se desbloquea en el nivel ${item.unlockLevel} (tu nivel: ${level})`
+            : `${item.name}: se desbloquea al confirmar ${SCARF_PAUSES} retos MihaiFIT (llevas ${s.stats.movePauses})`,
+        );
         btn.addEventListener('click', () => this.store.run((st) => buyItem(st, item.id)));
       } else {
         const affordable = s.coins >= item.price;
@@ -732,7 +746,7 @@ export class UI {
     $('move-cancel').addEventListener('click', () => {
       this.store.update((s) => dismissMove(s, this.moveTimer));
       this.setMoveTimer(cancelMove());
-      this.toast('Pausa cancelada. Puedes empezar otra cuando quieras.');
+      this.toast('Reto cancelado. Puedes empezar otro cuando quieras.');
     });
     $('move-yes').addEventListener('click', () => {
       let claim: ReturnType<typeof confirmMove> | null = null;
@@ -772,7 +786,7 @@ export class UI {
     }
     if (t.status === 'done' && !wasDone) {
       this.sfx.play('move');
-      this.toast('¡Tiempo! Confirma si has hecho tu pausa.');
+      this.toast('¡Tiempo! Confirma si has hecho tu reto.');
       window.setTimeout(() => ($('move-yes') as HTMLButtonElement).focus(), 50);
     }
     this.renderMove();
@@ -802,11 +816,11 @@ export class UI {
     $('move-ring').style.setProperty('--p', `${Math.round(ratio * 360)}deg`);
     $('move-ring').dataset.status = t.status;
 
-    let tip = 'Elige la duración y pulsa Empezar.';
+    let tip = `Elige un reto y pulsa Empezar. «${MOVE_CHALLENGES[this.moveMinutes === 2 ? 2 : 1]}» dura ${this.moveMinutes} ${this.moveMinutes === 1 ? 'minuto' : 'minutos'}.`;
     if (t.status === 'running') tip = MOVE_TIPS[this.moveTipIndex % MOVE_TIPS.length];
     else if (t.status === 'paused')
       tip = t.autoPaused ? 'Pausada porque saliste de la pantalla. Pulsa Continuar cuando vuelvas.' : 'En pausa. Pulsa Continuar cuando quieras.';
-    else if (t.status === 'done') tip = '¡Lo has conseguido! Solo cuenta si de verdad hiciste la pausa.';
+    else if (t.status === 'done') tip = '¡Lo has conseguido! Solo cuenta si de verdad hiciste el reto.';
     const tipEl = $('move-tip');
     if (tipEl.textContent !== tip) tipEl.textContent = tip;
 
@@ -822,8 +836,8 @@ export class UI {
     const done = Math.min(MOVE_DAILY_LIMIT, s.daily.move);
     $('move-status').textContent =
       done >= MOVE_DAILY_LIMIT
-        ? `Hoy ya tienes las ${MOVE_DAILY_LIMIT} pausas con premio. Puedes seguir haciendo pausas sin premio.`
-        : `Hoy: ${done}/${MOVE_DAILY_LIMIT} pausas con premio (+${MOVE_COINS} monedas y +${MOVE_XP} XP cada una).`;
+        ? `Hoy ya tienes los ${MOVE_DAILY_LIMIT} retos con premio. Puedes seguir haciendo retos sin premio.`
+        : `Hoy: ${done}/${MOVE_DAILY_LIMIT} retos con premio (+${MOVE_COINS} monedas y +${MOVE_XP} XP cada uno). Pañuelo MihaiFIT: ${Math.min(s.stats.movePauses, SCARF_PAUSES)}/${SCARF_PAUSES} retos.`;
   }
 
   /* ---------------- Sonido ---------------- */

@@ -14,10 +14,15 @@ los sonidos se sintetizan con Web Audio en `src/audio/sfx.ts`, sin archivos).
   Botón 🔊/🔇 siempre visible arriba y volumen en Ajustes (se recuerdan). El audio solo se activa tras tocar/pulsar algo;
   silenciar corta al instante. No hay música ni nada que suene solo. Si el navegador no tiene Web Audio, el juego sigue igual.
 - **Vínculo**: experiencia y niveles con barra clara. Cada subida da monedas una sola vez, confeti y salto de celebración.
-- **Misiones diarias** (cuidado útil, superar 3 obstáculos acumulados, momento de movimiento) y **7 logros** permanentes con objetivo visible.
-- **Más vida**: frases cortas según personalidad y estado, "+XP" flotante, avisos en cola y la **cinta deportiva**,
-  regalo al llegar al nivel 3.
-- **Moverse** (primer puente con MihaiFIT): pausa activa de 1 o 2 minutos con Mimi moviéndose contigo.
+- **Misiones diarias** (cuidado útil, superar 3 obstáculos acumulados, momento de movimiento) y **8 logros** permanentes con objetivo visible.
+- **Más vida**: frases cortas según personalidad y estado, "+XP" flotante y avisos en cola.
+- **Retos MihaiFIT** (primer puente con MihaiFIT): pausas activas «Activa tu día» (1 min) y «Hoy toca moverse» (2 min)
+  con Mimi moviéndose contigo. Registro manual y local.
+- **Accesorios MihaiFIT**: **Cinta MihaiFIT** (cabeza, regalo del nivel 3) y **Pañuelo MihaiFIT** (cuello, regalo al
+  confirmar 3 retos). Se pueden llevar a la vez y se ven en la habitación y en MIMI HOP.
+- Guiño de marca acotado: solo la cápsula de Retos y los accesorios usan carbón `#070A08`, grafito `#141A16`,
+  texto `#EEF1E8` y un acento lima `#C9FF2F` fino (por debajo del 10 % de la pieza) y el lema «Hoy toca.».
+  El resto de MIMI mantiene su lavanda. Sin logos inventados: solo el nombre escrito.
 - Pestañas en rejilla 3×2 legibles a 360 px.
 
 ## Pila
@@ -54,8 +59,8 @@ npm run preview   # sirve dist/
 - Saltar: tocar la escena, `Espacio`, `↑`, `W` o el botón **Saltar**.
 - El primer salto empieza la partida. Al chocar aparece el resumen con **Reintentar** / **Volver a la habitación**.
 
-**Moverse**
-- Elige 1 o 2 minutos, **Empezar**, **Pausar/Continuar** o **Cancelar**. Al acabar el tiempo, confirma si hiciste la pausa.
+**Retos MihaiFIT** (pestaña «Retos MihaiFIT»)
+- Elige «Activa tu día» (1 min) o «Hoy toca moverse» (2 min), **Empezar**, **Pausar/Continuar** o **Cancelar**. Al acabar el tiempo, confirma si hiciste la pausa.
 
 ## Reglas y límites (verificados por pruebas)
 
@@ -73,7 +78,7 @@ npm run preview   # sirve dist/
 
 **Monedas y tienda**
 - Se empieza con 20 monedas. Máximo 999 999.
-- 7 accesorios de tienda (15–60 monedas) + la cinta deportiva (regalo del nivel 3), en 3 zonas: cabeza, cara, cuello. Uno por zona.
+- 7 accesorios de tienda (15–60 monedas) + Cinta MihaiFIT (regalo del nivel 3) y Pañuelo MihaiFIT (regalo de 3 retos), en 3 zonas: cabeza, cara, cuello. Uno por zona.
 - Comprar sin saldo suficiente se rechaza y dice cuántas monedas faltan: **el saldo nunca es negativo**.
 - Lo comprado se equipa automáticamente; volver a pulsar lo quita / lo pone.
 
@@ -87,28 +92,32 @@ npm run preview   # sirve dist/
 **Vínculo (XP y niveles)**
 - Pasar del nivel *n* al siguiente cuesta `30 + 15·(n−1)` XP (nivel 2 = 30 XP, nivel 3 = 75 XP). Máximo nivel 50.
 - Subir a nivel *n* da `10 + 2·n` monedas **una sola vez** (`levelRewarded` guarda el último nivel pagado).
-- Nivel 3: regalo de la **cinta deportiva** (cabeza). Se pone sola solo si la cabeza estaba libre; no se puede comprar.
+- Nivel 3: regalo de la **Cinta MihaiFIT** (id `cinta`, cabeza). Se pone sola solo si la cabeza estaba libre; no se puede comprar.
+- 3 retos confirmados (`stats.movePauses ≥ 3`, cuenten o no para el premio diario): logro «Hoy toca.» y regalo del
+  **Pañuelo MihaiFIT** (id `panuelo-mihaifit`, cuello), una sola vez; se pone solo si el cuello estaba libre.
+  Un guardado que tenga el pañuelo sin ese logro (o la cinta sin el nivel 3) lo pierde al validarse.
 - XP de cuidados: **+5** solo si el cuidado es *útil* (saciedad o limpieza < 70, cariño < 80, energía < 40 al dormir)
   y como mucho **una vez cada 45 s por tipo**. Spamear caricias no da más. Si el reloj retrocede, no se da XP y la espera se reinicia.
 - MIMI HOP: `2 + floor(puntos/2)` XP, máximo 15, una vez por partida (mismo identificador que las monedas).
 - No hay castigos: la XP nunca baja y no pasa nada por no volver.
 
 **Misiones diarias** (fecha local AAAA-MM-DD)
-- Cuidado útil ×3 (+8 monedas, +15 XP) · Superar 3 obstáculos en MIMI HOP, acumulados (+8, +15 XP) · 1 pausa de movimiento (+10, +20 XP).
+- Cuidado útil ×3 (+8 monedas, +15 XP) · Superar 3 obstáculos en MIMI HOP, acumulados (+8, +15 XP) · 1 reto MihaiFIT (+10, +20 XP).
 - Cada misión se reclama **una vez al día**; el estado se guarda, así que recargar no permite cobrar otra vez.
 - Se renuevan cuando la fecha local es posterior a la guardada. Si el reloj va **hacia atrás**, se conserva el día guardado (no se renueva ni se duplica nada).
 
 **Logros** (permanentes, se pagan una vez): Primer mimo útil (5), Cuidadora constante (25 cuidados útiles, 15),
-Saltarina (10 puntos en una partida, 10), Lazos fuertes (nivel 3, 10), En marcha (primera pausa, 10),
+Saltarina (10 puntos en una partida, 10), Lazos fuertes (nivel 3, 10), En marcha (primer reto, 10),
+Hoy toca. (3 retos confirmados, 10 + **Pañuelo MihaiFIT**),
 Día redondo (las 3 misiones de un día, 15), Coleccionista (3 accesorios, 10).
 Una partida 0.1 que ya cumplía alguno (p. ej. récord ≥ 10) lo recibe una vez al cargarla.
 
-**Moverse (pausa activa)**
-- Duración 1 o 2 minutos. Sugerencias suaves que cambian cada 20 s ("estírate", "camina un poco", "baila"…);
+**Retos MihaiFIT (pausa activa)**
+- «Activa tu día» = 1 minuto, «Hoy toca moverse» = 2 minutos (mismas reglas para ambos). Sugerencias suaves que cambian cada 20 s ("estírate", "camina un poco", "baila"…);
   sin repeticiones, calorías ni indicaciones clínicas.
 - Solo cuenta con la app **en primer plano**: al ocultar la pestaña/app se **pausa** (nunca se completa sola). Además,
   si entre dos ticks pasan más de 1,5 s (pestaña congelada) ese tiempo no cuenta y queda en pausa.
-- Al terminar, la persona confirma "Sí, la he hecho" → +5 monedas y +10 XP, **máximo 2 pausas con premio al día**.
+- Al terminar, la persona confirma "Sí, lo he hecho" → +5 monedas y +10 XP, **máximo 2 retos con premio al día**.
   Cada pausa tiene identificador: confirmar dos veces, recargar o reutilizar una sesión antigua no vuelve a pagar.
 - Es un **registro manual y local**: sin cuenta, sensores, pasos, entrenamientos reales ni envío de datos.
 - Enlace sencillo a <https://www.mihaifit.es/> (`rel="noopener noreferrer"`, sin parámetros de seguimiento).
@@ -186,8 +195,12 @@ Gracias a `base: './'` funciona bajo `https://<usuario>.github.io/mimi-game/`.
 
 ## Capturas (prueba de humo, Chromium + WebGL)
 
-| Habitación (360 px) | Misiones | Moverse | Cinta deportiva |
+| Habitación (360 px) | Misiones | Retos MihaiFIT | Accesorios MihaiFIT |
 | --- | --- | --- | --- |
-| ![Habitación](docs/screenshots/movil-habitacion.png) | ![Misiones](docs/screenshots/movil-misiones.png) | ![Moverse](docs/screenshots/movil-moverse.png) | ![Cinta](docs/screenshots/movil-cinta.png) |
+| ![Habitación](docs/screenshots/movil-habitacion.png) | ![Misiones](docs/screenshots/movil-misiones.png) | ![Retos MihaiFIT](docs/screenshots/movil-retos.png) | ![Cinta y Pañuelo MihaiFIT](docs/screenshots/movil-accesorios.png) |
+
+| MIMI HOP con accesorios | Cápsula MihaiFIT |
+| --- | --- |
+| ![HOP](docs/screenshots/hop-accesorios.png) | ![Cápsula](docs/screenshots/movil-capsula.png) |
 
 ![Escritorio](docs/screenshots/escritorio.png)
